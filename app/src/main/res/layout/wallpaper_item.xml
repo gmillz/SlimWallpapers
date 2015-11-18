@@ -14,9 +14,16 @@
      limitations under the License.
 -->
 
-<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
-           android:background="?android:attr/galleryItemBackground"
-           android:layout_width="wrap_content"
-           android:layout_height="wrap_content"
-           android:scaleType="fitXY"
-           android:focusable="true" />
+<org.slimroms.wallpaper.CheckableFrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="@dimen/wallpaperThumbnailWidth"
+    android:layout_height="@dimen/wallpaperThumbnailHeight"
+    android:focusable="true"
+    android:clickable="true"
+    android:foreground="@drawable/wallpaper_tile_fg">
+    <ImageView
+        android:id="@+id/wallpaper_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop" />
+</org.slimroms.wallpaper.CheckableFrameLayout>

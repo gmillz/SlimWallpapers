@@ -18,23 +18,23 @@
 */
 -->
 
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent">
 
     <ImageView
-            android:id="@+id/wallpaper"
-            android:layout_width="fill_parent"
-            android:layout_height="0dip"
-            android:layout_weight="0.99"
-            android:scaleType="fitCenter" />
+        android:id="@+id/wallpaper"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
     <HorizontalScrollView
         android:layout_width="match_parent"
+        android:gravity="bottom"
+        android:layout_gravity="bottom"
         android:layout_height="wrap_content">
 
-        <com.slim.wallpaper.HorizontalLayout
+        <org.slimroms.wallpaper.HorizontalLayout
             android:id="@+id/gallery"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -42,4 +42,4 @@
 
     </HorizontalScrollView>
 
-</LinearLayout>
+</FrameLayout>

@@ -18,15 +18,11 @@
 <resources>
 
     <string-array name="wallpapers" translatable="false">
-        <item>slimblues</item>
-        <item>slimcircles</item>
-        <item>slimflourish</item>
-        <item>slimleather</item>
-        <item>slimwall</item>
-        <item>skatcat</item>
-        <item>skatdefault</item>
-        <item>skatdenim</item>
-        <item>skatorigami</item>
+        <item>wallpaper_1</item>
+        <item>wallpaper_2</item>
+    </string-array>
+
+    <string-array name="extra_wallpapers" translatable="false">
     </string-array>
 
 </resources>
