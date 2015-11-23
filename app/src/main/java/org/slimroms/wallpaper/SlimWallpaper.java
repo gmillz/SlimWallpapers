@@ -19,7 +19,6 @@ package org.slimroms.wallpaper;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.Executor;
@@ -28,14 +27,16 @@ import java.util.concurrent.Executors;
 import android.app.ActionBar;
 import android.app.Activity;
 import android.app.WallpaperManager;
-import android.content.res.AssetManager;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Point;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
@@ -66,10 +67,13 @@ public class SlimWallpaper extends Activity {
     private static WallpaperLoader mLoader;
 
     Executor mExecutor = Executors.newFixedThreadPool(2);
+    Point mSize;
 
     @Override
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
+
+        mSize = getWallpaperSize();
 
         new ImageResizer().executeOnExecutor(mExecutor);
 
@@ -116,7 +120,7 @@ public class SlimWallpaper extends Activity {
         switch (item.getItemId()) {
             case R.id.save:
                 try {
-                    saveWallpaper(mLayout.getCurrent());
+                    saveWallpaper();
                 } catch (IOException e) {
                     e.printStackTrace();
                     makeToast("Failed to make folder");
@@ -130,10 +134,32 @@ public class SlimWallpaper extends Activity {
         Toast.makeText(getApplicationContext(), s, Toast.LENGTH_SHORT).show();
     }
 
-    private void saveWallpaper(int position) throws IOException {
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == 123) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                try {
+                    saveWallpaper();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private void saveWallpaper() throws IOException {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(
+                        new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 123);
+                return;
+            }
+        }
         File folder = new File(Environment.getExternalStorageDirectory() + "/Slim/wallpapers");
-        String file = folder + "/" + getResources().getStringArray(R.array.wallpapers)[position]
-                + ".png";
+        String file = folder + "/" +
+                getResources().getStringArray(R.array.wallpapers)[mLayout.getCurrent()] + ".png";
         String toastText;
         if (!folder.exists()) {
             if (!folder.mkdirs()) {
@@ -142,7 +168,10 @@ public class SlimWallpaper extends Activity {
         }
         try {
             FileOutputStream out = new FileOutputStream(file);
-            mBitmap.compress(Bitmap.CompressFormat.PNG, 99, out);
+            Bitmap b = getFullsizeBitmap();
+            if (b != null) {
+                b.compress(Bitmap.CompressFormat.PNG, 99, out);
+            }
             out.close();
         } catch (Exception e) {
             e.printStackTrace();
@@ -238,6 +267,15 @@ public class SlimWallpaper extends Activity {
         mWallpapers.clear();
     }
 
+    private Bitmap getFullsizeBitmap() {
+        int id = getResources().getIdentifier(
+                mImages.get(mLayout.getCurrent()), "drawable", getPackageName());
+        if (id != 0) {
+            return decodeSampledBitmapFromResource(getResources(), id, mSize.x, mSize.y);
+        }
+        return null;
+    }
+
     /*
      * When using touch if you tap an image it triggers both the onItemClick and
      * the onTouchEvent causing the wallpaper to be set twice. Ensure we only
@@ -251,9 +289,12 @@ public class SlimWallpaper extends Activity {
         mIsWallpaperSet = true;
         try {
             WallpaperManager wm = WallpaperManager.getInstance(getApplicationContext());
-            wm.setBitmap(mBitmap);
-            setResult(RESULT_OK);
-            finish();
+            Bitmap b = getFullsizeBitmap();
+            if (b != null) {
+                wm.setBitmap(b);
+                setResult(RESULT_OK);
+                finish();
+            }
         } catch (IOException e) {
             Log.e("Paperless System", "Failed to set wallpaper: " + e);
         }
@@ -281,9 +322,10 @@ public class SlimWallpaper extends Activity {
                     int res = getResources().getIdentifier(extras[i], "drawable", getPackageName());
                     if (res != 0) {
                         mImages.add(extras[i]);
-                        Bitmap bitmap = getBitmapFromAssets(extras[i]);
+                        Bitmap b = decodeSampledBitmapFromResource(
+                                getResources(), res, mSize.x / 3, mSize.y / 3);
                         Drawable d = ImageHelper.resize(getApplicationContext(),
-                               new BitmapDrawable(getResources(), bitmap), 75);
+                               new BitmapDrawable(getResources(), b), 75);
                         publishProgress(info.update(d, i));
                     }
                 }
@@ -300,14 +342,13 @@ public class SlimWallpaper extends Activity {
     class WallpaperLoader extends AsyncTask<Integer, Void, Bitmap> {
 
         BitmapFactory.Options mOptions;
-        Point mSize = getWallpaperSize();
 
         WallpaperLoader() {
             mOptions = new BitmapFactory.Options();
             mOptions.inDither = false;
             mOptions.inPreferredConfig = Bitmap.Config.ARGB_8888;
             mOptions.inJustDecodeBounds = true;
-            mOptions.inSampleSize = calculateInSampleSize(mOptions, mSize.x, mSize.y);
+            mOptions.inSampleSize = calculateInSampleSize(mOptions, mSize.x / 2, mSize.y / 2);
         }
 
         protected Bitmap doInBackground(Integer... params) {
@@ -323,7 +364,8 @@ public class SlimWallpaper extends Activity {
             if (mWallpapers.containsKey(name)) {
                 b = mWallpapers.get(name);
             } else {
-                b = getBitmapFromAssets(name);
+                int id = getResources().getIdentifier(name, "drawable", getPackageName());
+                b = decodeSampledBitmapFromResource(getResources(), id, mSize.x / 3, mSize.y / 3);
                 mWallpapers.put(name, b);
             }
             Point size = getWallpaperSize();
@@ -378,17 +420,19 @@ public class SlimWallpaper extends Activity {
         return inSampleSize;
     }
 
-    private Bitmap getBitmapFromAssets(String name) {
-        AssetManager assetManager = getAssets();
+    public static Bitmap decodeSampledBitmapFromResource(Resources res, int resId,
+                                                         int reqWidth, int reqHeight) {
 
-        InputStream is;
-        Bitmap bitmap = null;
-        try {
-            is = assetManager.open("wallpapers/" + name + ".png");
-            bitmap = BitmapFactory.decodeStream(is);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return bitmap;
+        // First decode with inJustDecodeBounds=true to check dimensions
+        final BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeResource(res, resId, options);
+
+        // Calculate inSampleSize
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+
+        // Decode bitmap with inSampleSize set
+        options.inJustDecodeBounds = false;
+        return BitmapFactory.decodeResource(res, resId, options);
     }
 }
